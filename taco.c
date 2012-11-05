@@ -24,8 +24,11 @@ typedef struct _ant {
 
 #define alpha 1.0
 #define beta 1.0
-#define N 10
-#define EPS_REL 0.2
+#define p 0.1
+#define N 100
+#define EPS_REL 0.1
+#define MAX_ITER 100
+#define COUNT 101
 
 inline double distance(Coord* p1, Coord* p2);
 inline double max_overload(Ant* ant);
@@ -41,6 +44,8 @@ void create_feasible_solution();
 int F(Ant* a, Ant* b, int f_idx);
 int Compare(Ant* a, Ant* b, int* order, int len);
 void simulate();
+void get_best_ant();
+void update_tau();
 
 #if !DEBUG
 
@@ -55,7 +60,6 @@ int* IN;
 
 #else
 
-#define COUNT 26
 Coord coords[COUNT];
 TimeWindow tw[COUNT];
 double w[COUNT];
@@ -78,15 +82,27 @@ int main(int argc, char** argv){
     init();
     create_feasible_solution();
     simulate();
+    int i;
+    for(i=0;i<loc_best->route_len;i++)
+        printf("%d->", loc_best->route[i]);
 
     free_mem();
     return 0;
 }
 
 void read_input(){
+    char buf[128];
+    int i,j;
     scanf("%s\n", (char*)&name);
+    
+    for(i=0;i<3;i++)
+        scanf("%s \n", buf);
+    
     scanf("%d %lf", &count, &capacity);
-    count++;
+    count = COUNT;
+    
+    for(i=0;i<12;i++)
+        scanf("%s \n", buf);
 
 #if !DEBUG
     coords = (Coord*)malloc(sizeof(Coord)*count);
@@ -99,7 +115,6 @@ void read_input(){
     IN = (int*)malloc(sizeof(int)*count);
 #endif
 
-    int i,j;
     for(i=0;i<count;i++){
         scanf("%d", &j);
         scanf("%lf %lf %lf", &(coords[j].x), &(coords[j].y), &(w[j]));
@@ -180,13 +195,21 @@ void create_ants(){
 }
 
 void simulate(){
-    
+    int i=0;
+    do{
+        create_feasible_solution();
+        get_best_ant();
+        printf("%d routes, %6.3f delay, %6.3f overload, %6.3f length\n", 
+                loc_best->route_count, loc_best->max_delay, 
+                loc_best->max_overload, loc_best->total_time);
+        update_tau();
+    } while (++i<MAX_ITER);   
 }
 
 void get_best_ant(){
     int i;
     loc_best = &(ants[0]);
-    int order[4] = {0,1,2,3};
+    int order[4] = {3,1,2,0};
     for(i=1;i<N;i++){
         if(Compare(&(ants[i]), loc_best, (int*)&order, 4) < 0)
             loc_best = &(ants[i]);
@@ -204,8 +227,20 @@ void create_feasible_solution(){
 	int i;
 	for(i=0;i<N;i++)
 		ant_action(i);
+}
+
+void update_tau(){
+    int i,j, from, to;
+    Ant* ant;
+    for(i=0;i<count*count;i++)
+        tau[i] = (1-p) * tau[i];
     
-    get_best_ant();
+    ant = loc_best;
+    for(j=0;j<ant->route_len-1;j++){
+        from = ant->route[j];
+        to = ant->route[j+1];
+        tau[from*count+to] += 3000.0/ant->total_time;
+    }
 }
 
 void ant_action(int idx){
