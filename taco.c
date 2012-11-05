@@ -3,6 +3,7 @@
 #include <math.h>
 #include <time.h>
 #include <memory.h>
+#include <sys/param.h>
 
 typedef struct _twnd {
     double start;
@@ -24,7 +25,7 @@ typedef struct _ant {
 #define alpha 1.0
 #define beta 1.0
 #define N 10
-#define EPS_REL 0.05
+#define EPS_REL 0.2
 
 inline double distance(Coord* p1, Coord* p2);
 inline double max_overload(Ant* ant);
@@ -37,6 +38,9 @@ void create_ants();
 void delete_ants();
 void ant_action(int idx);
 void create_feasible_solution();
+int F(Ant* a, Ant* b, int f_idx);
+int Compare(Ant* a, Ant* b, int* order, int len);
+void simulate();
 
 #if !DEBUG
 
@@ -66,12 +70,14 @@ int IN[COUNT];
 char name[10];
 int count;
 double capacity;
+Ant* loc_best;
 
 int main(int argc, char** argv){
     srand(time(NULL));
     read_input();
     init();
     create_feasible_solution();
+    simulate();
 
     free_mem();
     return 0;
@@ -173,6 +179,20 @@ void create_ants(){
 	}
 }
 
+void simulate(){
+    
+}
+
+void get_best_ant(){
+    int i;
+    loc_best = &(ants[0]);
+    int order[4] = {0,1,2,3};
+    for(i=1;i<N;i++){
+        if(Compare(&(ants[i]), loc_best, (int*)&order, 4) < 0)
+            loc_best = &(ants[i]);
+    }
+}
+
 void delete_ants(){
 	int i;
 	for(i=0;i<N;i++){
@@ -184,6 +204,8 @@ void create_feasible_solution(){
 	int i;
 	for(i=0;i<N;i++)
 		ant_action(i);
+    
+    get_best_ant();
 }
 
 void ant_action(int idx){
@@ -257,4 +279,41 @@ void ant_action(int idx){
 	free(P);
 	free(visited);
 	free(route);
+}
+
+int Compare(Ant* a, Ant* b, int* order, int len){
+    int res = 0;
+    if(len>0){
+        res = F(a,b,order[0]);
+        if(res == 0 && len > 1)
+            res = Compare(a,b,&(order[1]), len-1);
+    }
+    return res;
+}
+
+int F(Ant* a, Ant* b, int f_idx){
+    double va = 0, vb = 0;
+    switch(f_idx){
+        case 0:
+            va = a->route_count;
+            vb = b->route_count;
+            break;
+        case 1:
+            va = a->max_delay;
+            vb = b->max_delay;
+            break;
+        case 2:
+            va = a->max_overload;
+            vb = b->max_overload;
+            break;
+        case 3:
+            va = a->total_time;
+            vb = b->total_time;
+            break;
+    }
+    if(va-vb < -EPS_REL*MIN(va,vb))
+        return -1;
+    else if(va-vb > EPS_REL*MIN(va,vb))
+        return 1;
+    return 0;
 }
